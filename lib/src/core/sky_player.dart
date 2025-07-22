@@ -24,44 +24,51 @@ class SkyPlayer extends StatefulWidget {
   /// to portrait and close itself.
   final bool autoEnterExitFullScreenMode;
 
+  /// Helps detect fullscreen mode
+  /// to prevent two platform views
+  /// this means that when you open full screen mode the previous one disappears
+  final bool _isFullScreenInstance;
+
+  /// Enables native implementation of the player interface (overlayBuilder will not work)
+  final bool isNativeControlsEnabled;
+
   final Widget Function(BuildContext context, SkyPlayerState state,
       SkyPlayerController controller)? overlayBuilder;
-
-  // Helps detect fullscreen mode
-  // to prevent two platform views
-  // this means that when you open full screen mode the previous one disappears
-  final bool _isFullScreenInstance;
 
   const SkyPlayer({
     required this.url,
     this.controller,
-    this.overlayBuilder,
     this.autoEnterExitFullScreenMode = false,
+    this.isNativeControlsEnabled = false,
+    this.overlayBuilder,
     super.key,
   }) : _isFullScreenInstance = false;
 
   const SkyPlayer._fullscreen({
     required this.url,
     required this.controller,
-    this.overlayBuilder,
+    required this.isNativeControlsEnabled,
     required this.autoEnterExitFullScreenMode,
+    this.overlayBuilder,
   }) : _isFullScreenInstance = true;
 
   factory SkyPlayer.network(
     String url, {
     SkyPlayerController? controller,
+    bool isNativeControlsEnabled = false,
+    bool autoEnterExitFullScreenMode = false,
     Widget Function(BuildContext context, SkyPlayerState state,
             SkyPlayerController controller)?
         overlayBuilder,
-    bool autoEnterExitFullScreenMode = false,
     Key? key,
   }) =>
       SkyPlayer(
         key: key,
         url: url,
         controller: controller,
-        overlayBuilder: overlayBuilder,
         autoEnterExitFullScreenMode: autoEnterExitFullScreenMode,
+        isNativeControlsEnabled: isNativeControlsEnabled,
+        overlayBuilder: overlayBuilder,
       );
 
   @override
@@ -75,6 +82,7 @@ class _SkyPlayerState extends State<SkyPlayer> {
   @override
   void initState() {
     super.initState();
+
     if (widget.controller != null) {
       _controller = widget.controller!;
       _isLocalController = false;
@@ -82,6 +90,8 @@ class _SkyPlayerState extends State<SkyPlayer> {
       _controller = SkyPlayerController()..initPlayer(widget.url);
       _isLocalController = true;
     }
+
+    _controller.setNativeControlsEnabled(widget.isNativeControlsEnabled);
   }
 
   @override
@@ -103,6 +113,7 @@ class _SkyPlayerState extends State<SkyPlayer> {
           url: widget.url,
           state: state ?? SkyPlayerState.initial(),
           controller: _controller,
+          isNativeControlsEnabled: widget.isNativeControlsEnabled,
           overlayBuilder: widget.overlayBuilder,
           isFullScreenInstance: widget._isFullScreenInstance,
           autoEnterExitFullScreenMode: widget.autoEnterExitFullScreenMode,
@@ -118,6 +129,7 @@ class _SkyPlayerWithControls extends StatefulWidget {
   final SkyPlayerState state;
   final String url;
   final bool isFullScreenInstance;
+  final bool isNativeControlsEnabled;
   final bool autoEnterExitFullScreenMode;
 
   final Widget Function(BuildContext context, SkyPlayerState state,
@@ -127,9 +139,10 @@ class _SkyPlayerWithControls extends StatefulWidget {
     required this.url,
     required this.state,
     required this.controller,
-    this.overlayBuilder,
+    required this.isNativeControlsEnabled,
     this.isFullScreenInstance = false,
     this.autoEnterExitFullScreenMode = false,
+    this.overlayBuilder,
   });
 
   @override
@@ -185,6 +198,7 @@ class _SkyPlayerWithControlsState extends State<_SkyPlayerWithControls>
                 controller: _controller,
                 overlayBuilder: widget.overlayBuilder,
                 autoEnterExitFullScreenMode: widget.autoEnterExitFullScreenMode,
+                isNativeControlsEnabled: widget.isNativeControlsEnabled,
               ),
             ),
           ),

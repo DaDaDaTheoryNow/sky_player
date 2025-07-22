@@ -30,10 +30,8 @@ class SkyPlayerController {
   Future<void> play() => VideoPlayerPlatform.instance.play();
   Future<void> pause() => VideoPlayerPlatform.instance.pause();
 
-  Future<void> showNativeControls() =>
-      VideoPlayerPlatform.instance.setNativeControlsEnabled(true);
-  Future<void> hideNativeControls() =>
-      VideoPlayerPlatform.instance.setNativeControlsEnabled(false);
+  Future<void> setNativeControlsEnabled(bool isEnabled) =>
+      VideoPlayerPlatform.instance.setNativeControlsEnabled(isEnabled);
 
   Future<void> seekTo(int position) =>
       VideoPlayerPlatform.instance.seekTo(position);
