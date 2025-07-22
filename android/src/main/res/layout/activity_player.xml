@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+             android:layout_width="match_parent"
+             android:layout_height="match_parent">
+
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/player_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/black"/>
+
+<!--    <Button-->
+<!--        android:id="@+id/qualityButton"-->
+<!--        android:layout_width="wrap_content"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        android:text="Quality"-->
+<!--        android:layout_gravity="top|end"-->
+<!--        android:layout_margin="16dp" />-->
+
+<!--        app:animation_enabled="false"-->
+<!--        app:show_buffering="always"-->
+<!--        tools:foreground="@color/player_background" />-->
+
+</FrameLayout>
