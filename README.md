@@ -1,8 +1,8 @@
 # SkyPlayer
 
-<img width="1080" height="2306" alt="Screenshot_20250818-191148_sky_player_example~2" src="https://github.com/user-attachments/assets/fc45463d-7e0b-4d4b-8964-6520035c88e0" />
-<img width="2400" height="1080" alt="Screenshot_20250818-191240_sky_player_example" src="https://github.com/user-attachments/assets/6d168040-6967-471f-83fa-9c21848b12e8" />
-<img width="2400" height="1080" alt="Screenshot_20250818-191359_sky_player_example" src="https://github.com/user-attachments/assets/7bf38c55-d29b-4622-b475-29d5ffd7d94e" />
+<img width="270" height="577" alt="Screenshot_20250818-191148_sky_player_example~2" src="https://github.com/user-attachments/assets/fc45463d-7e0b-4d4b-8964-6520035c88e0" />
+<img width="600" height="270" alt="Screenshot_20250818-191240_sky_player_example" src="https://github.com/user-attachments/assets/6d168040-6967-471f-83fa-9c21848b12e8" />
+<img width="600" height="270" alt="Screenshot_20250818-191359_sky_player_example" src="https://github.com/user-attachments/assets/7bf38c55-d29b-4622-b475-29d5ffd7d94e" />
 
 A lightweight, ExoPlayer-based video player plugin focused on **network streaming** with **customizable UI controls**, smart fullscreen behavior and a simple API.
 
