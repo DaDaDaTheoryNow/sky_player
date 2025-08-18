@@ -1,5 +1,10 @@
 export 'src/core/sky_player.dart';
 export 'src/core/sky_player_controller.dart';
 export 'src/core/sky_player_state.dart';
+export 'src/models/audio_track.dart';
+export 'src/models/subtitle_track.dart';
 export 'src/models/video_resolution.dart';
-export 'src/version/sky_player_version_controller.dart';
+export 'src/models/sky_player_aspect_mode.dart';
+export 'src/models/cues.dart';
+export 'src/localization/sky_player_languages.dart';
+export 'src/localization/sky_player_localizations.dart';

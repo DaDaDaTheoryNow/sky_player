@@ -2,9 +2,14 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:sky_player/src/models/audio_track.dart';
+import 'package:sky_player/src/models/cues.dart';
+import 'package:sky_player/src/models/subtitle_track.dart';
 import 'package:sky_player/src/models/video_resolution.dart';
 import 'package:sky_player/src/video_player/video_player_platform_interface.dart';
 
+/// Platform implementation using MethodChannel for SkyPlayer.
+/// Responsible for sending commands to native code and exposing state streams.
 class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   @visibleForTesting
   final methodChannel = const MethodChannel('sky_player_channel');
@@ -16,93 +21,155 @@ class MethodChannelVideoPlayer extends VideoPlayerPlatform {
   late final Stream<Map<String, dynamic>> _sharedStream;
 
   MethodChannelVideoPlayer() {
+    // Convert the native event stream into a broadcast stream of maps
     _sharedStream = eventChannel.receiveBroadcastStream().map((event) {
       return Map<String, dynamic>.from(event);
     }).asBroadcastStream();
   }
 
   @override
-  Future<void> initPlayerWithHls(String url) {
-    return methodChannel.invokeMethod('initPlayerWithHls', {
-      'url': url,
+  Future<void> initLogger(
+      {required bool debug, bool fileLogging = false}) async {
+    await methodChannel.invokeMethod('initLogger', {
+      'debug': debug,
+      'fileLogging': fileLogging,
     });
   }
+  // -------------------------------
+  // Core player operations
+  // -------------------------------
 
   @override
-  Future<void> play() {
-    return methodChannel.invokeMethod<void>('play');
-  }
+  Future<int?> createTexture() =>
+      methodChannel.invokeMethod<int>('createTexture');
 
   @override
-  Future<void> pause() {
-    return methodChannel.invokeMethod<void>('pause');
-  }
+  Future<void> setSurfaceSize(int width, int height) =>
+      methodChannel.invokeMethod<void>(
+        'setSurfaceSize',
+        {'width': width, 'height': height},
+      );
 
   @override
-  Future<void> seekTo(int position) {
-    return methodChannel.invokeMethod<void>('seekTo', {
-      'position': position,
-    });
-  }
+  Future<void> initPlayerWithNetwork(String url) => methodChannel.invokeMethod(
+        'initPlayerWithNetwork',
+        {'url': url},
+      );
 
   @override
-  Future<void> setNativeControlsEnabled(bool isEnabled) {
-    return methodChannel.invokeMethod<void>('setNativeControlsEnabled', {
-      'isEnabled': isEnabled,
-    });
-  }
+  Future<void> releasePlayer() =>
+      methodChannel.invokeMethod<void>('releasePlayer');
 
   @override
-  Future<void> setResolution(String? resolutionId) {
-    return methodChannel.invokeMethod<void>('setResolution', {
-      'resolutionId': resolutionId,
-    });
-  }
+  Future<void> play() => methodChannel.invokeMethod<void>('play');
+
+  @override
+  Future<void> pause() => methodChannel.invokeMethod<void>('pause');
+
+  @override
+  Future<void> seekTo(int position) => methodChannel.invokeMethod<void>(
+        'seekTo',
+        {'position': position},
+      );
+
+  @override
+  Future<void> setResolution(String? resolutionId) => methodChannel
+      .invokeMethod<void>('setResolution', {'resolutionId': resolutionId});
+
+  @override
+  Future<void> setAudioTrack(String? trackId) =>
+      methodChannel.invokeMethod<void>('setAudioTrack', {'trackId': trackId});
+
+  @override
+  Future<void> setSubtitleTrack(String? trackId) => methodChannel
+      .invokeMethod<void>('setSubtitleTrack', {'trackId': trackId});
+
+  // -------------------------------
+  // Simple state streams
+  // -------------------------------
+
+  @override
+  Stream<int?> get textureIdStream =>
+      _sharedStream.map((e) => e['textureId'] as int?);
+
+  @override
+  Stream<double?> get videoAspectRatio =>
+      _sharedStream.map((e) => e['videoAspectRatio'] as double?);
 
   @override
   Stream<bool> get isPlayingStream =>
-      _sharedStream.map((event) => event['isPlaying'] as bool);
+      _sharedStream.map((e) => e['isPlaying'] as bool);
 
   @override
   Stream<int> get positionStream =>
-      _sharedStream.map((event) => event['position'] as int);
+      _sharedStream.map((e) => e['position'] as int);
 
   @override
   Stream<int> get durationStream =>
-      _sharedStream.map((event) => event['duration'] as int);
+      _sharedStream.map((e) => e['duration'] as int);
 
   @override
   Stream<int> get bufferingStream =>
-      _sharedStream.map((event) => event['buffering'] as int);
+      _sharedStream.map((e) => e['buffering'] as int);
 
   @override
   Stream<bool> get isLoadingStream =>
-      _sharedStream.map((event) => event['isLoading'] as bool);
+      _sharedStream.map((e) => e['isLoading'] as bool);
 
   @override
   Stream<bool> get isNativeControlsEnabled =>
-      _sharedStream.map((event) => event['isNativeControlsEnabled'] as bool);
+      _sharedStream.map((e) => e['isNativeControlsEnabled'] as bool);
 
   @override
   Stream<String?> get selectedResolutionId =>
-      _sharedStream.map((event) => event['selectedResolutionId'] as String?);
+      _sharedStream.map((e) => e['selectedResolutionId'] as String?);
 
   @override
-  Stream<List<VideoResolution>> get availableVideoResolutions {
+  Stream<String?> get selectedAudioTrackId =>
+      _sharedStream.map((e) => e['selectedAudioTrackId'] as String?);
+
+  @override
+  Stream<String?> get selectedSubtitleTrackId =>
+      _sharedStream.map((e) => e['selectedSubtitleTrackId'] as String?);
+
+  // -------------------------------
+  // Complex streams with JSON decoding
+  // -------------------------------
+
+  Stream<List<T>> _decodeListStream<T>(
+    String key,
+    T Function(Map<String, dynamic>) fromJson,
+  ) {
     return _sharedStream.map((event) {
       try {
-        final jsonString = event['availableResolutions'];
+        final jsonString = event[key];
         final decoded = jsonDecode(jsonString);
         if (decoded is List) {
           return decoded
-              .map(
-                  (e) => VideoResolution.fromJson(Map<String, dynamic>.from(e)))
+              .map((e) => fromJson(Map<String, dynamic>.from(e)))
               .toList();
         }
       } catch (e, stack) {
-        debugPrint('Parsing error: $e\n$stack');
+        debugPrint('Parsing error ($key): $e\n$stack');
       }
-      return <VideoResolution>[];
+      return <T>[];
     });
   }
+
+  @override
+  Stream<List<VideoResolution>> get availableVideoResolutions =>
+      _decodeListStream(
+          'availableResolutions', (e) => VideoResolution.fromJson(e));
+
+  @override
+  Stream<List<AudioTrack>> get availableAudioTracks =>
+      _decodeListStream('availableAudioTracks', (e) => AudioTrack.fromJson(e));
+
+  @override
+  Stream<List<SubtitleTrack>> get availableSubtitleTracks => _decodeListStream(
+      'availableSubtitleTracks', (e) => SubtitleTrack.fromJson(e));
+
+  @override
+  Stream<Cues> get currentCues => _sharedStream.map((e) =>
+      Cues.fromJson(Map<String, dynamic>.from(jsonDecode(e['currentCues']))));
 }

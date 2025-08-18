@@ -1,6 +1,6 @@
 name: sky_player
 description: A lightweight yet powerful video player plugin specializing in network streaming with fully customizable UI controls.
-version: 0.0.2
+version: 0.1.0
 homepage: https://github.com/DaDaDaTheoryNow/sky_player
 
 environment:
@@ -12,6 +12,8 @@ dependencies:
     sdk: flutter
   plugin_platform_interface: ^2.0.2
   rxdart: ^0.28.0
+  audio_video_progress_bar: ^2.0.3
+  meta: ^1.15.0
 
 dev_dependencies:
   flutter_test:

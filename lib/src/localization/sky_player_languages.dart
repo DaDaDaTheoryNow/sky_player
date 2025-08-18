@@ -1,0 +1,4 @@
+enum SkyPlayerLanguages {
+  en,
+  ru,
+}

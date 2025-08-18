@@ -68,7 +68,7 @@ android {
         testImplementation("org.jetbrains.kotlin:kotlin-test")
         testImplementation("org.mockito:mockito-core:5.2.0")
 
-        def composeBom = platform("androidx.compose:compose-bom:2025.06.01")
+        def composeBom = platform("androidx.compose:compose-bom:2025.08.00")
         implementation composeBom
         androidTestImplementation composeBom
 
@@ -84,23 +84,14 @@ android {
         androidTestImplementation("androidx.compose.ui:ui-test-junit4")
         debugImplementation("androidx.compose.ui:ui-test-manifest")
 
-        // Optional - Included automatically by material, only add when you need
-        // the icons but not the material library (e.g. when using Material3 or a
-        // custom design system based on Foundation)
-//        implementation 'androidx.compose.material:material-icons-core'
-        // Optional - Add full set of material icons
-//        implementation 'androidx.compose.material:material-icons-extended'
-        // Optional - Add window size utils
-//        implementation 'androidx.compose.material3.adaptive:adaptive'
 
-        // Optional - Integration with activities
         implementation("androidx.activity:activity-compose:1.10.1")
-//        implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.1")
-        // Optional - Integration with ViewModels
-        implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.1")
+        implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.2")
+
+        // logs
+        implementation("com.jakewharton.timber:timber:5.0.1")
 
         // player
-        // rewrite with ""
         implementation("androidx.media3:media3-common:1.7.1")
         implementation("androidx.media3:media3-exoplayer:1.7.1")
         implementation("androidx.media3:media3-exoplayer-dash:1.7.1")

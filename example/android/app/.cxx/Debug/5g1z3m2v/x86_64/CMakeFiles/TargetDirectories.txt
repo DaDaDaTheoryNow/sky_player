@@ -1,0 +1,2 @@
+/Users/skyfly/FlutterProjects/sky_player/example/android/app/.cxx/Debug/5g1z3m2v/x86_64/CMakeFiles/edit_cache.dir
+/Users/skyfly/FlutterProjects/sky_player/example/android/app/.cxx/Debug/5g1z3m2v/x86_64/CMakeFiles/rebuild_cache.dir

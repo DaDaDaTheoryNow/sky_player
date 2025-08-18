@@ -1,24 +1,30 @@
 package com.dadadadev.sky_player.view_model
 
-import androidx.media3.ui.PlayerView
-import kotlinx.serialization.Serializable
+import com.dadadadev.sky_player.models.AudioTrack
+import com.dadadadev.sky_player.models.Cues
+import com.dadadadev.sky_player.models.SubtitleTrack
+import com.dadadadev.sky_player.models.VideoResolution
 
 data class SkyPlayerState(
+    val textureId: Long? = null,
+
     val isPlaying: Boolean = false,
     val position: Long = 0L,
     val duration: Long = 0L,
     val buffering: Long = 0L,
     val isLoading: Boolean = true,
-    val isNativeControlsEnabled: Boolean = false,
-    val playerView: PlayerView? = null,
-    val availableVideoResolutions: List<VideoResolution> = emptyList(),
-    val selectedResolutionId: String? = null
-)
+    val videoAspectRatio: Double? = null,
 
-@Serializable
-data class VideoResolution(
-    val id: String,
-    val width: Int,
-    val height: Int,
-    val bitrate: Int,
+    // resolution section
+    val availableVideoResolutions: List<VideoResolution> = emptyList(),
+    val selectedResolutionId: String? = null,
+
+    // audio track section
+    val availableAudioTracks: List<AudioTrack> = emptyList(),
+    val selectedAudioTrackId: String? = null,
+
+    // subtitles section
+    val availableSubtitleTracks: List<SubtitleTrack> = emptyList(),
+    val selectedSubtitleTrackId: String? = null,
+    val currentCues: Cues = Cues(),
 )

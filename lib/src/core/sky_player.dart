@@ -1,75 +1,89 @@
-// ignore_for_file: use_build_context_synchronously
+import 'dart:async';
+import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:io';
-import 'package:flutter/rendering.dart';
-import 'package:sky_player/src/core/sky_player_controller.dart';
-import 'package:sky_player/src/core/sky_player_state.dart';
+import 'package:meta/meta.dart';
+
+import 'package:sky_player/sky_player.dart';
+import 'package:sky_player/src/overlay/sky_player_basic_overlay.dart';
+import 'package:sky_player/src/subtitles/subtitles_render_widget.dart';
 import 'package:sky_player/src/utils/orientation_listener_widget.dart';
+
+/// SkyPlayer — wrapper widget around the native player.
+/// Supports fullscreen mode, automatic orientation transitions,
+/// subtitle rendering and overlay delegation.
 
 class SkyPlayer extends StatefulWidget {
   final String url;
   final SkyPlayerController? controller;
+  final bool autoFullscreenOnRotate;
+  final SkyPlayerAspectMode aspectMode;
+  final SkyPlayerLanguages language;
+  final bool forceDisposeController;
 
-  /// If true, the player will automatically enter fullscreen mode
-  /// when the device is rotated to landscape, and automatically exit
-  /// fullscreen mode when rotated back to portrait. This helps provide
-  /// a native-like video experience, especially on mobile devices.
-  ///
-  /// Note: Only the main player (not fullscreen instance) will react to
-  /// landscape and open fullscreen. Only the fullscreen instance will react
-  /// to portrait and close itself.
-  final bool autoEnterExitFullScreenMode;
+  /// Builder for the overlay (controls, buttons, etc.).
+  final Widget Function(BuildContext, SkyPlayerState, SkyPlayerController)?
+      overlayBuilder;
 
-  /// Helps detect fullscreen mode
-  /// to prevent two platform views
-  /// this means that when you open full screen mode the previous one disappears
+  /// Internal flag marking a fullscreen instance (created only when entering fullscreen).
   final bool _isFullScreenInstance;
 
-  /// Enables native implementation of the player interface (overlayBuilder will not work)
-  final bool isNativeControlsEnabled;
-
-  final Widget Function(BuildContext context, SkyPlayerState state,
-      SkyPlayerController controller)? overlayBuilder;
-
+  @internal
   const SkyPlayer({
     required this.url,
     this.controller,
-    this.autoEnterExitFullScreenMode = false,
-    this.isNativeControlsEnabled = false,
-    this.overlayBuilder,
+    this.autoFullscreenOnRotate = false,
+    this.aspectMode = SkyPlayerAspectMode.auto,
+    this.overlayBuilder = defaultOverlayBuilder,
+    this.language = SkyPlayerLanguages.en,
+    this.forceDisposeController = false,
     super.key,
   }) : _isFullScreenInstance = false;
 
-  const SkyPlayer._fullscreen({
-    required this.url,
-    required this.controller,
-    required this.isNativeControlsEnabled,
-    required this.autoEnterExitFullScreenMode,
-    this.overlayBuilder,
-  }) : _isFullScreenInstance = true;
-
+  /// Network constructor
   factory SkyPlayer.network(
     String url, {
-    SkyPlayerController? controller,
-    bool isNativeControlsEnabled = false,
-    bool autoEnterExitFullScreenMode = false,
-    Widget Function(BuildContext context, SkyPlayerState state,
-            SkyPlayerController controller)?
-        overlayBuilder,
+    bool autoFullscreenOnRotate = false,
+    SkyPlayerAspectMode aspectMode = SkyPlayerAspectMode.auto,
+    SkyPlayerLanguages language = SkyPlayerLanguages.en,
+    Widget Function(BuildContext, SkyPlayerState, SkyPlayerController)?
+        overlayBuilder = defaultOverlayBuilder,
     Key? key,
   }) =>
       SkyPlayer(
         key: key,
         url: url,
-        controller: controller,
-        autoEnterExitFullScreenMode: autoEnterExitFullScreenMode,
-        isNativeControlsEnabled: isNativeControlsEnabled,
+        controller: null,
+        autoFullscreenOnRotate: autoFullscreenOnRotate,
+        aspectMode: aspectMode,
         overlayBuilder: overlayBuilder,
+        language: language,
       );
+
+  @internal
+  const SkyPlayer.fullscreen({
+    super.key,
+    required this.url,
+    required this.controller,
+    required this.autoFullscreenOnRotate,
+    required this.aspectMode,
+    required this.language,
+    this.overlayBuilder = defaultOverlayBuilder,
+    this.forceDisposeController = false,
+  }) : _isFullScreenInstance = true;
+
+  static Widget defaultOverlayBuilder(
+    BuildContext context,
+    SkyPlayerState state,
+    SkyPlayerController controller,
+  ) {
+    return SkyPlayerBasicOverlay(
+      state: state,
+      controller: controller,
+      localization: SkyPlayerLocalization(language: state.language),
+    );
+  }
 
   @override
   State<SkyPlayer> createState() => _SkyPlayerState();
@@ -77,71 +91,89 @@ class SkyPlayer extends StatefulWidget {
 
 class _SkyPlayerState extends State<SkyPlayer> {
   late final SkyPlayerController _controller;
-  late final bool _isLocalController;
+  late final bool _ownsController;
+
+  @override
+  void dispose() {
+    // Dispose only controllers we created (avoid double-dispose).
+    // If controller is not owned by this widget, it is expected to be disposed by the caller.
+    if (_ownsController || widget.forceDisposeController) {
+      debugPrint('SkyPlayer: Disposing controller');
+      _controller.dispose();
+    }
+
+    super.dispose();
+  }
 
   @override
   void initState() {
     super.initState();
 
-    if (widget.controller != null) {
-      _controller = widget.controller!;
-      _isLocalController = false;
-    } else {
-      _controller = SkyPlayerController()..initPlayer(widget.url);
-      _isLocalController = true;
+    _controller = widget.controller ?? SkyPlayerController();
+    _ownsController = widget.controller == null;
+
+    if (!_controller.isInitialized) {
+      unawaited(_controller.initOrSwitchToUrl(widget.url));
     }
 
-    _controller.setNativeControlsEnabled(widget.isNativeControlsEnabled);
+    _controller.setOverlayLanguage(widget.language);
   }
 
   @override
-  void dispose() {
-    if (_isLocalController) {
-      _controller.dispose();
+  void didUpdateWidget(covariant SkyPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // If the URL changed → reinitialize
+    if (widget.url != oldWidget.url && !_controller.isDisposed) {
+      unawaited(_controller.initOrSwitchToUrl(widget.url));
     }
-    super.dispose();
+
+    _controller.setOverlayLanguage(widget.language);
   }
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<SkyPlayerState>(
       stream: _controller.stateStream,
+      // Provide a safe initial state when the stream has not emitted yet.
       builder: (context, snapshot) {
-        final state = snapshot.data;
-
+        final state = snapshot.data ?? SkyPlayerState.initial();
         return _SkyPlayerWithControls(
           url: widget.url,
-          state: state ?? SkyPlayerState.initial(),
+          state: state,
           controller: _controller,
-          isNativeControlsEnabled: widget.isNativeControlsEnabled,
           overlayBuilder: widget.overlayBuilder,
           isFullScreenInstance: widget._isFullScreenInstance,
-          autoEnterExitFullScreenMode: widget.autoEnterExitFullScreenMode,
+          autoFullscreenOnRotate: widget.autoFullscreenOnRotate,
+          aspectMode: widget.aspectMode,
+          language: widget.language,
         );
       },
     );
   }
 }
 
-// Builds a player with a control overlay
+/// Widget that renders the player itself together with overlay/subtitles.
 class _SkyPlayerWithControls extends StatefulWidget {
   final SkyPlayerController controller;
   final SkyPlayerState state;
   final String url;
   final bool isFullScreenInstance;
-  final bool isNativeControlsEnabled;
-  final bool autoEnterExitFullScreenMode;
+  final bool autoFullscreenOnRotate;
+  final SkyPlayerAspectMode aspectMode;
+  final SkyPlayerLanguages language;
 
-  final Widget Function(BuildContext context, SkyPlayerState state,
-      SkyPlayerController controller)? overlayBuilder;
+  final Widget Function(BuildContext, SkyPlayerState, SkyPlayerController)?
+      overlayBuilder;
 
   const _SkyPlayerWithControls({
     required this.url,
     required this.state,
     required this.controller,
-    required this.isNativeControlsEnabled,
     this.isFullScreenInstance = false,
-    this.autoEnterExitFullScreenMode = false,
+    this.autoFullscreenOnRotate = false,
+    this.aspectMode = SkyPlayerAspectMode.auto,
+    this.language = SkyPlayerLanguages.en,
     this.overlayBuilder,
   });
 
@@ -149,178 +181,147 @@ class _SkyPlayerWithControls extends StatefulWidget {
   State<_SkyPlayerWithControls> createState() => _SkyPlayerWithControlsState();
 }
 
-class _SkyPlayerWithControlsState extends State<_SkyPlayerWithControls>
-    with WidgetsBindingObserver {
+class _SkyPlayerWithControlsState extends State<_SkyPlayerWithControls> {
   SkyPlayerController get _controller => widget.controller;
 
-  // Fullscreen was opened by autorotate
-  bool _autoFullScreenEntered = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller.isFullScreen.addListener(_onFullScreenChanged);
-    WidgetsBinding.instance.addObserver(this);
-  }
+  Timer? _surfaceSizeDebounceTimer;
+  int? _lastWidthPx;
+  int? _lastHeightPx;
 
   @override
   void dispose() {
-    _controller.isFullScreen.removeListener(_onFullScreenChanged);
-    WidgetsBinding.instance.removeObserver(this);
+    _surfaceSizeDebounceTimer?.cancel();
     super.dispose();
   }
 
-  void _onFullScreenChanged() {
-    if (_controller.isFullScreen.value) {
-      _openFullScreen();
-    } else {
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
+  /// Debounce sending the surface size to native code.
+  void _maybeSendSurfaceSize(int widthPx, int heightPx) {
+    if (_lastWidthPx == widthPx && _lastHeightPx == heightPx) return;
+
+    _lastWidthPx = widthPx;
+    _lastHeightPx = heightPx;
+
+    _surfaceSizeDebounceTimer?.cancel();
+    _surfaceSizeDebounceTimer = Timer(const Duration(milliseconds: 150), () {
+      try {
+        widget.controller.setSurfaceSize(widthPx, heightPx);
+      } catch (e, st) {
+        debugPrint('SkyPlayer: setSurfaceSize failed: $e\n$st');
       }
-    }
-  }
-
-  void _openFullScreen() async {
-    if (_controller.url != null) {
-      // Set device orientation to landscape when entering fullscreen
-      await SystemChrome.setPreferredOrientations([
-        DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
-      ]);
-
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => Scaffold(
-            backgroundColor: Colors.black,
-            body: SafeArea(
-              child: SkyPlayer._fullscreen(
-                url: _controller.url!,
-                controller: _controller,
-                overlayBuilder: widget.overlayBuilder,
-                autoEnterExitFullScreenMode: widget.autoEnterExitFullScreenMode,
-                isNativeControlsEnabled: widget.isNativeControlsEnabled,
-              ),
-            ),
-          ),
-        ),
-      );
-
-      if (_autoFullScreenEntered) {
-        await SystemChrome.setPreferredOrientations([
-          DeviceOrientation.portraitUp,
-        ]);
-
-        // Then we resolve all orientations through a small delay
-        await Future.delayed(const Duration(milliseconds: 200));
-        await SystemChrome.setPreferredOrientations([
-          DeviceOrientation.portraitUp,
-          DeviceOrientation.portraitDown,
-          DeviceOrientation.landscapeLeft,
-          DeviceOrientation.landscapeRight,
-        ]);
-
-        _autoFullScreenEntered = false;
-      } else {
-        await SystemChrome.setPreferredOrientations([
-          DeviceOrientation.portraitUp,
-          DeviceOrientation.portraitDown,
-          DeviceOrientation.landscapeLeft,
-          DeviceOrientation.landscapeRight,
-        ]);
-      }
-
-      _controller.closeFullScreen();
-    }
-  }
-
-  void _closeFullscreenWithPop() {
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
-    }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return OrientationListener(
       onOrientationChange: (orientation) {
-        // Entering fullscreen mode if we rotated the device to landscape mode
+        // When rotated to landscape, open fullscreen automatically if enabled.
         if (!widget.isFullScreenInstance &&
-            widget.autoEnterExitFullScreenMode &&
+            widget.autoFullscreenOnRotate &&
             orientation == Orientation.landscape &&
-            !_controller.isFullScreen.value) {
-          _autoFullScreenEntered = true;
-          _controller.openFullScreen();
+            !widget.state.isFullscreen) {
+          _controller.openFullScreenExternally(
+            context,
+            // Do not dispose controller after closing fullscreen.
+            forceDisposeController: false,
+          );
         }
 
-        // Exit fullscreen mode when returning to portrait
+        // When rotated back to portrait, close fullscreen if this is the fullscreen instance.
         if (widget.isFullScreenInstance &&
-            widget.autoEnterExitFullScreenMode &&
+            widget.autoFullscreenOnRotate &&
             orientation == Orientation.portrait) {
-          _closeFullscreenWithPop();
+          _controller.closeFullscreenPlayerWithPop(context);
         }
       },
-      child: widget.isFullScreenInstance
-          ? _buildPlayer()
-          : ValueListenableBuilder<bool>(
-              valueListenable: _controller.isFullScreen,
-              builder: (context, isFullScreen, child) {
-                if (isFullScreen) {
-                  return const SizedBox.shrink();
-                }
-                return _buildPlayer();
-              },
-            ),
+      child: _buildPlayerStack(context),
     );
   }
 
-  Widget _buildPlayer() {
-    Widget playerWidget;
-    if (Platform.isAndroid) {
-      playerWidget = PlatformViewLink(
-        viewType: 'sky_player_view',
-        surfaceFactory: (context, controller) {
-          return AndroidViewSurface(
-            controller: controller as AndroidViewController,
-            gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{},
-            hitTestBehavior: PlatformViewHitTestBehavior.opaque,
-          );
-        },
-        onCreatePlatformView: (params) {
-          return PlatformViewsService.initSurfaceAndroidView(
-            id: params.id,
-            viewType: 'sky_player_view',
-            layoutDirection: TextDirection.ltr,
-            creationParamsCodec: const StandardMessageCodec(),
-            onFocus: () {
-              params.onFocusChanged(true);
-            },
-          )
-            ..addOnPlatformViewCreatedListener(params.onPlatformViewCreated)
-            ..create();
-        },
-      );
-    } else if (Platform.isIOS) {
-      playerWidget = UiKitView(
-        viewType: 'sky_player_view',
-        layoutDirection: TextDirection.ltr,
-        creationParams: {
-          'url':
-              "https://playertest.longtailvideo.com/adaptive/elephants_dream_v4/index.m3u8"
-        },
-        creationParamsCodec: StandardMessageCodec(),
-      );
-    } else {
-      playerWidget = const Center(child: Text('Platform not available'));
-    }
+  Widget _buildPlayerStack(BuildContext context) {
+    final playerView = _buildPlatformPlayer(context);
 
     return Stack(
-      children: [
-        playerWidget,
-        // Overlay with player controls
-        if (widget.overlayBuilder != null &&
-            !widget.state.isNativeControlsEnabled)
+      children: <Widget>[
+        playerView,
+        if (widget.overlayBuilder != null)
           widget.overlayBuilder!(context, widget.state, _controller),
+        if (widget.state.currentCues.text.isNotEmpty)
+          SubtitlesRendererWidget(state: widget.state),
       ],
     );
+  }
+
+  Widget _buildPlatformPlayer(BuildContext context) {
+    // Android: Texture, iOS: UiKitView, others: placeholder
+    if (Platform.isAndroid) {
+      return LayoutBuilder(builder: (context, constraints) {
+        final textureId = widget.state.textureId;
+        if (textureId == null) {
+          return const ColoredBox(color: Colors.black);
+        }
+
+        final mq = MediaQuery.of(context);
+        final maxW = constraints.maxWidth.isFinite
+            ? constraints.maxWidth
+            : mq.size.width;
+        final maxH = constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : mq.size.height;
+        final dp = mq.devicePixelRatio;
+
+        final (width, height) = _calculateDimensions(
+          maxW: maxW,
+          maxH: maxH,
+          aspectRatio: widget.state.videoAspectRatio ?? (16.0 / 9.0),
+        );
+
+        // Debounce the native call for surface sizing.
+        _maybeSendSurfaceSize((width * dp).round(), (height * dp).round());
+
+        return Center(
+          child: SizedBox(
+            width: width,
+            height: height,
+            child: Texture(textureId: textureId),
+          ),
+        );
+      });
+    }
+
+    if (Platform.isIOS) {
+      return UiKitView(
+        viewType: 'sky_player_view',
+        layoutDirection: TextDirection.ltr,
+        creationParams: {'url': widget.url},
+        creationParamsCodec: const StandardMessageCodec(),
+      );
+    }
+
+    // Web / Desktop / Unsupported — show placeholder
+    return const Center(child: Text('Platform not available'));
+  }
+
+  /// Calculate the display size for the player based on available space and aspect ratio.
+  (double width, double height) _calculateDimensions({
+    required double maxW,
+    required double maxH,
+    required double aspectRatio,
+  }) {
+    var width = maxW;
+    var height = width / aspectRatio;
+
+    if (height > maxH) {
+      height = maxH;
+      width = height * aspectRatio;
+    }
+
+    // Fallback if calculated dimensions are invalid.
+    if (width <= 0 || height <= 0 || width.isNaN || height.isNaN) {
+      width = maxW;
+      height = maxW / aspectRatio;
+    }
+
+    return (width, height);
   }
 }
