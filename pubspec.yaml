@@ -1,6 +1,6 @@
 name: sky_player
 description: A lightweight yet powerful video player plugin specializing in network streaming with fully customizable UI controls.
-version: 0.1.0
+version: 0.1.1
 homepage: https://github.com/DaDaDaTheoryNow/sky_player
 
 environment:

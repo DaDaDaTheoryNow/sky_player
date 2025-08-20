@@ -444,7 +444,7 @@ class _SkyPlayerBasicOverlayState extends State<SkyPlayerBasicOverlay> {
               ),
               _buildSettingsItem(
                 icon: Icons.volume_up,
-                title: 'Аудиодорожка',
+                title: widget.localization.audioTrack,
                 subtitle: widget.state.availableAudioTracks
                         .cast<AudioTrack?>()
                         .firstWhere(
